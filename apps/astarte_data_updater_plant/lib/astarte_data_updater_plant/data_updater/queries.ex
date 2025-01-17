@@ -19,6 +19,7 @@
 defmodule Astarte.DataUpdaterPlant.DataUpdater.Queries do
   alias Astarte.Core.CQLUtils
   alias Astarte.Core.Device
+  alias Astarte.Core.Device.Capabilities
   alias Astarte.Core.InterfaceDescriptor
   alias Astarte.Core.Mapping
   alias Astarte.DataUpdaterPlant.Config
@@ -448,6 +449,53 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.Queries do
     for {key, value} <- map, into: %{} do
       {List.to_tuple(key), value}
     end
+  end
+
+  def fetch_device_capabilities(db_client, device_id) do
+    device_capabilities_statement = """
+    SELECT purge_properties_compression_format
+    FROM devices
+    WHERE device_id=:device_id
+    """
+
+    device_capabilities_query =
+      DatabaseQuery.new()
+      |> DatabaseQuery.statement(device_capabilities_statement)
+      |> DatabaseQuery.put(:device_id, device_id)
+
+    with {:ok, result} <- DatabaseQuery.call(db_client, device_capabilities_query) do
+      capabilities_row =
+        result
+        |> DatabaseResult.head()
+        |> Enum.into(%{})
+
+      capabilities =
+        %Capabilities{}
+        |> Capabilities.changeset(capabilities_row)
+        |> Ecto.Changeset.apply_changes()
+
+      {:ok, capabilities}
+    end
+  end
+
+  def set_device_capabilities(
+        db_client,
+        device_id,
+        %Capabilities{purge_properties_compression_format: format} = _capabilities
+      ) do
+    device_capabilities_statement = """
+    UPDATE devices
+    SET purge_properties_compression_format=:format
+    WHERE device_id=:device_id
+    """
+
+    device_capabilities_query =
+      DatabaseQuery.new()
+      |> DatabaseQuery.statement(device_capabilities_statement)
+      |> DatabaseQuery.put(:format, format)
+      |> DatabaseQuery.put(:device_id, device_id)
+
+    DatabaseQuery.call!(db_client, device_capabilities_query)
   end
 
   def set_device_connected!(db_client, device_id, timestamp_ms, ip_address) do

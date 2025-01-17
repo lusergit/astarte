@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `booleanarray`, `longintegerarray`, `stringarray`, `datetimearray`, `binaryblobarray`.
 - [astarte_export] Added a new command for exporting by device_id. 
   `mix astarte.export $REALM $FILE_XML $DEVICE_ID`
+- [astarte_data_updater_plant] Added the `capabilities` endpoint for devices,
+  setting whether the device should get the purge properties compressed with
+  `zlib` or in plaintext
 
 ## [1.2.1] - Unreleased
 ### Changed
