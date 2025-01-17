@@ -19,6 +19,7 @@
 defmodule Astarte.DataUpdaterPlant.DataUpdater.Queries do
   alias Astarte.Core.CQLUtils
   alias Astarte.Core.Device
+  alias Astarte.Core.Device.Capabilities
   alias Astarte.Core.InterfaceDescriptor
   alias Astarte.Core.Mapping
   alias Astarte.DataUpdaterPlant.Config
@@ -447,6 +448,90 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.Queries do
   defp convert_tuple_keys(map) when is_map(map) do
     for {key, value} <- map, into: %{} do
       {List.to_tuple(key), value}
+    end
+  end
+
+  def fetch_device_capabilities(realm, device_id) do
+    Xandra.Cluster.run(
+      :xandra,
+      &do_fetch_device_capabilities(&1, realm, device_id)
+    )
+  end
+
+  defp do_fetch_device_capabilities(conn, realm, device_id) do
+    statement = """
+    SELECT purge_properties_compression_format
+    FROM #{realm}.devices
+    WHERE device_id=:device_id
+    """
+
+    with {:ok, prepared} <- Xandra.prepare(conn, statement),
+         {:ok, %Xandra.Page{} = page} <-
+           Xandra.execute(conn, prepared, %{"device_id" => device_id}, uuid_format: :binary) do
+      capabilities = Enum.map(page, &map_to_capabilities/1)
+
+      {:ok, hd(capabilities)}
+    else
+      {:error, %Xandra.Error{} = error} ->
+        _ =
+          Logger.warning(
+            "Database error while fetching device #{device_id} capabilities: #{Exception.message(error)}"
+          )
+
+        {:error, :database_error}
+
+      {:error, %Xandra.ConnectionError{} = error} ->
+        _ =
+          Logger.warning(
+            "Database connection error while fetching device #{device_id} capabilities: #{Exception.message(error)}"
+          )
+
+        {:error, :database_connection_error}
+    end
+  end
+
+  defp map_to_capabilities(change) do
+    %Capabilities{}
+    |> Capabilities.changeset(change)
+    |> Ecto.Changeset.apply_changes()
+  end
+
+  def set_device_capabilities(
+        realm,
+        device_id,
+        capabilities
+      ) do
+    Xandra.Cluster.run(
+      :xandra,
+      &do_update_device_capabilities(&1, realm, device_id, capabilities)
+    )
+  end
+
+  defp do_update_device_capabilities(conn, realm, device_id, capabilities) do
+    %Capabilities{
+      purge_properties_compression_format: format
+    } = capabilities
+
+    value =
+      Capabilities
+      |> Ecto.Enum.mappings(:purge_properties_compression_format)
+      |> Keyword.fetch!(format)
+
+    statement = """
+    UPDATE #{realm}.devices
+    SET purge_properties_compression_format=:format
+    WHERE device_id=:device_id
+    """
+
+    with {:ok, prepared} <- Xandra.prepare(conn, statement),
+         {:ok, %Xandra.Page{} = page} <-
+           Xandra.execute(
+             conn,
+             prepared,
+             %{"device_id" => device_id, "format" => value},
+             uuid_format: :binary
+           ) do
+      Enum.map(page, &map_to_capabilities/1)
     end
   end
 
