@@ -69,7 +69,8 @@ defmodule Astarte.DataUpdaterPlant.Mixfile do
   defp astarte_required_modules(_) do
     [
       {:astarte_core, github: "astarte-platform/astarte_core"},
-      {:astarte_data_access, github: "astarte-platform/astarte_data_access"},
+      {:astarte_data_access,
+       github: "lusergit/astarte_data_access", branch: "feat/device-capabilities"},
       {:astarte_rpc, github: "astarte-platform/astarte_rpc"}
     ]
   end
@@ -90,7 +91,6 @@ defmodule Astarte.DataUpdaterPlant.Mixfile do
       {:telemetry_metrics_prometheus_core, "~> 0.4"},
       {:telemetry_metrics, "~> 0.4"},
       {:telemetry_poller, "~> 0.4"},
-      {:xandra, "~> 0.13"},
       {:skogsra, "~> 2.2"},
       {:telemetry, "~> 0.4"},
       {:observer_cli, "~> 1.5"},

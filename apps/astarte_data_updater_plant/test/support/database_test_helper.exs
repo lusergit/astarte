@@ -63,7 +63,7 @@ defmodule Astarte.DataUpdaterPlant.DatabaseTestHelper do
         last_pairing_ip inet,
         last_seen_ip inet,
         groups map<text, timeuuid>,
-        purge_properties_compression_format varchar,
+        purge_properties_compression_format int,
 
         PRIMARY KEY (device_id)
     );
@@ -806,9 +806,9 @@ defmodule Astarte.DataUpdaterPlant.DatabaseTestHelper do
 
     compression_format =
       case Keyword.get(opts, :purge_properties_compression_format) do
-        nil -> "zlib"
-        :zlib -> "zlib"
-        :plaintext -> "plaintext"
+        nil -> 0
+        :zlib -> 0
+        :plaintext -> 1
       end
 
     query =

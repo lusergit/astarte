@@ -22,7 +22,6 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.Impl do
   alias Astarte.Core.CQLUtils
   alias Astarte.DataUpdaterPlant.Config
   alias Astarte.Core.Device
-  alias Astarte.Core.Device.Capabilities
   alias Astarte.Core.InterfaceDescriptor
   alias Astarte.Core.Mapping
   alias Astarte.Core.Mapping.EndpointsAutomaton
@@ -33,11 +32,13 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.Impl do
   alias Astarte.Core.Triggers.SimpleTriggersProtobuf.DeviceTrigger, as: ProtobufDeviceTrigger
   alias Astarte.Core.Triggers.SimpleTriggersProtobuf.Utils, as: SimpleTriggersProtobufUtils
   alias Astarte.Core.Triggers.SimpleTriggersProtobuf.AMQPTriggerTarget
+  alias Astarte.DataAccess.Astarte.Realm
   alias Astarte.DataAccess.Data
   alias Astarte.DataAccess.Database
   alias Astarte.DataAccess.Device, as: DeviceQueries
   alias Astarte.DataAccess.Interface, as: InterfaceQueries
   alias Astarte.DataAccess.Mappings
+  alias Astarte.DataAccess.Repo
   alias Astarte.DataUpdaterPlant.DataUpdater.Cache
   alias Astarte.DataUpdaterPlant.DataUpdater.CachedPath
   alias Astarte.DataUpdaterPlant.DataUpdater.EventTypeUtils
@@ -70,10 +71,6 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.Impl do
     # TODO change this, we want extended device IDs to fall in the same process
     {realm, device_id} = sharding_key
 
-    capabilities = %Capabilities{
-      purge_properties_compression_format: :zlib
-    }
-
     state = %State{
       realm: realm,
       device_id: device_id,
@@ -84,7 +81,6 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.Impl do
       interfaces_by_expiry: [],
       mappings: %{},
       paths_cache: Cache.new(@paths_cache_size),
-      device_triggers: %{},
       data_triggers: %{},
       volatile_triggers: [],
       interface_exchanged_bytes: %{},
@@ -96,7 +92,7 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.Impl do
       discard_messages: false,
       last_deletion_in_progress_refresh: 0,
       last_datastream_maximum_retention_refresh: 0,
-      capabilities: capabilities
+      purge_properties_compression_format: :zlib
     }
 
     encoded_device_id = Device.encode_device_id(device_id)
@@ -110,12 +106,12 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.Impl do
 
     {:ok, ttl} = Queries.fetch_datastream_maximum_storage_retention(db_client)
 
-    {:ok, capabilities} = Queries.fetch_device_capabilities(db_client, device_id)
+    {:ok, device} = Queries.fetch_capabilities(realm, device_id) |> Repo.fetch_one()
 
     new_state =
       Map.merge(state, stats_and_introspection)
       |> Map.put(:datastream_maximum_storage_retention, ttl)
-      |> Map.put(:capabilities, capabilities)
+      |> Map.put(:purge_properties_compression_format, device.purge_properties_compression_format)
 
     {:ok, new_state}
   end
@@ -1621,33 +1617,20 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.Impl do
   end
 
   def handle_capabilities(state, payload, _timestamp) do
-    %{device_id: device_id} = state
+    %{device_id: device_id, realm: realm} = state
+    keyspace = Realm.keyspace_name(realm)
 
     with {:ok, bson_payload} <- decode_bson_payload(state, payload),
-         changeset = Capabilities.changeset(state.capabilities, bson_payload),
-         {:ok, capabilities} <- update_capabilities(changeset, state) do
-      {:ok, db_client} = Database.connect(realm: state.realm)
-      Queries.set_device_capabilities(db_client, device_id, capabilities)
+         {:ok, device} <- Queries.fetch_capabilities(realm, device_id) |> Repo.fetch_one(),
+         changeset =
+           Ecto.Changeset.cast(device, bson_payload, [:purge_properties_compression_format]),
+         {:ok, device} <- Repo.update(changeset, prefix: keyspace) do
+      new_state = %State{
+        state
+        | purge_properties_compression_format: device.purge_properties_compression_format
+      }
 
-      new_state = %State{state | capabilities: capabilities}
       {:ack, :ok, new_state}
-    end
-  end
-
-  defp update_capabilities(changeset, state) do
-    with {:error, error} <- Ecto.Changeset.apply_action(changeset, :update) do
-      Logger.warning(
-        "Error while updating capabilities: #{error}",
-        tag: "capabilities_error"
-      )
-
-      :telemetry.execute(
-        [:astarte, :data_updater_plant, :data_updater, :discarded_message],
-        %{},
-        %{realm: state.realm}
-      )
-
-      {:discard, error, state}
     end
   end
 
@@ -1684,7 +1667,7 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.Impl do
 
     # TODO: check payload size, to avoid anoying crashes
 
-    case inflate_purge_properties_payload(payload) do
+    case decode_purge_properties(payload) do
       {:ok, decoded_payload} ->
         :ok = prune_device_properties(new_state, decoded_payload, timestamp_ms)
 
@@ -1785,22 +1768,17 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.Impl do
     end
   end
 
-  defp inflate_purge_properties_payload(<<255, 255, 255, 255, payload::binary>>) do
-    _ =
-      Logger.debug("Received plaintext purge properties properties payload",
-        tag: "purge_properties"
-      )
+  defp decode_purge_properties(
+         %State{purge_properties_compression_format: :zlib} = state,
+         payload
+       ),
+       do: PayloadsDecoder.safe_inflate(payload)
 
-    {:ok, payload}
-  end
-
-  defp inflate_purge_properties_payload(<<_size_header::size(32), zlib_payload::binary>>) do
-    Logger.debug("Received zlib compressed purge properties properties payload",
-      tag: "purge_properties"
-    )
-
-    PayloadsDecoder.safe_inflate(zlib_payload)
-  end
+  defp decode_purge_properties(
+         %State{purge_properties_compression_format: :plaintext} = state,
+         payload
+       ),
+       do: {:ok, payload}
 
   defp delete_volatile_trigger(
          state,

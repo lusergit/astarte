@@ -22,7 +22,6 @@ defmodule Astarte.DataUpdaterPlant.DataUpdaterTest do
 
   alias Astarte.DataUpdaterPlant.Config
   alias Astarte.Core.Device
-  alias Astarte.Core.Device.Capabilities
   alias Astarte.Core.Triggers.SimpleEvents.DeviceConnectedEvent
   alias Astarte.Core.Triggers.SimpleEvents.IncomingDataEvent
   alias Astarte.Core.Triggers.SimpleEvents.PathRemovedEvent
@@ -39,6 +38,8 @@ defmodule Astarte.DataUpdaterPlant.DataUpdaterTest do
   alias Astarte.Core.Triggers.SimpleTriggersProtobuf.SimpleTriggerContainer
   alias Astarte.Core.Triggers.SimpleTriggersProtobuf.TriggerTargetContainer
   alias Astarte.DataAccess.Database
+  alias Astarte.DataAccess.Astarte.Realm
+  alias Astarte.DataAccess.Repo
   alias Astarte.DataUpdaterPlant.AMQPTestHelper
   alias Astarte.DataUpdaterPlant.DatabaseTestHelper
   alias Astarte.DataUpdaterPlant.DataUpdater.State
@@ -1756,14 +1757,15 @@ defmodule Astarte.DataUpdaterPlant.DataUpdaterTest do
     AMQPTestHelper.clean_queue()
 
     realm = "autotestrealm"
+    keyspace = Realm.keyspace_name(realm)
 
     device_id = Device.random_device_id()
     encoded_device_id = Device.encode_device_id(device_id)
 
     DatabaseTestHelper.insert_device(device_id)
 
-    state = dump_state(realm, encoded_device_id)
-    assert %Capabilities{purge_properties_compression_format: :zlib} = state.capabilities
+    assert %State{purge_properties_compression_format: :zlib} =
+             dump_state(realm, encoded_device_id)
 
     timestamp_us_x_10 = make_timestamp("2025-01-20T14:00:32+00:00")
 
@@ -1777,8 +1779,17 @@ defmodule Astarte.DataUpdaterPlant.DataUpdaterTest do
       timestamp_us_x_10
     )
 
-    new_state = dump_state(realm, encoded_device_id)
-    assert %Capabilities{purge_properties_compression_format: :plaintext} = new_state.capabilities
+    assert %State{purge_properties_compression_format: :plaintext} =
+             dump_state(realm, encoded_device_id)
+
+    device_capabilities_query =
+      Astarte.DataUpdaterPlant.DataUpdater.Queries.fetch_capabilities(realm, device_id)
+
+    {:ok, device} = Astarte.DataAccess.Repo.fetch_one(device_capabilities_query)
+
+    compression_format = device.purge_properties_compression_format
+
+    assert :plaintext = compression_format
   end
 
   defp retrieve_endpoint_id(client, interface_name, interface_major, path) do

@@ -47,6 +47,6 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.State do
     :discard_messages,
     :last_deletion_in_progress_refresh,
     :last_datastream_maximum_retention_refresh,
-    :capabilities
+    :purge_properties_compression_format
   ]
 end
