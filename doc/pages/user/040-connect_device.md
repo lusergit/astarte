@@ -69,6 +69,17 @@ connect to the Transport. Once in this state, the Device can start exchanging da
 installations are vulnerable to a number of different attacks and should NEVER be used in
 production.*
 
+### Device capabilities
+
+A device can define how future communication with Astarte will take place by
+specifying **capabilities**. Capabilities all have a default value and they can
+be changed singularly or in batch, by publishing a BSON message on `/<realm
+name>/<device id>/capabilities`.
+
+For a list of all available capabilities, their possible values and their
+purpouse, refer to [Astarte MQTT v1 Protocol
+specification](080-mqtt-v1-protocol.md#device-capabilities)
+
 ### Interfaces and Introspection
 
 A Device **must** have some installed interfaces to be capable of exchanging data. These interfaces
@@ -123,3 +134,6 @@ Please note that these parameters declared in Interfaces are to be considered on
 basis. In case your SDK does not support persistency or has persistency disabled, a number of
 warranties requested by an Interface might not be satisfied. Make sure your SDK is configured
 correctly before moving to production.
+
+<!--  LocalWords:  plaintext
+ -->
