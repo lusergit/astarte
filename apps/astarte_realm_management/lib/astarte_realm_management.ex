@@ -52,7 +52,8 @@ defmodule Astarte.RealmManagement do
       {Astarte.DataAccess, data_access_opts},
       {Astarte.RPC.AMQP.Server, [amqp_queue: Protocol.amqp_queue(), handler: Handler]},
       {Task.Supervisor, name: Astarte.RealmManagement.DeviceRemoverSupervisor},
-      Astarte.RealmManagement.DeviceRemoval.Scheduler
+      Astarte.RealmManagement.DeviceRemoval.Scheduler,
+      {Astarte.RealmManagement.Repo, xandra_opts}
     ]
 
     opts = [strategy: :one_for_one, name: Astarte.RealmManagement.Supervisor]
