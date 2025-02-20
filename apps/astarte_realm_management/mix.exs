@@ -85,6 +85,8 @@ defmodule Astarte.RealmManagement.Mixfile do
       {:telemetry_metrics, "~> 0.4"},
       {:telemetry_poller, "~> 0.4"},
       {:xandra, "~> 0.13"},
+      {:exandra, "~> 0.12"},
+      {:typed_ecto_schema, "~> 0.4"},
       {:observer_cli, "~> 1.5"},
       {:dialyxir, "~> 1.0", only: [:dev, :ci], runtime: false},
       # Workaround for Elixir 1.15 / ssl_verify_fun issue
