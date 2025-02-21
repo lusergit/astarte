@@ -19,6 +19,11 @@
 defmodule Astarte.RealmManagement.Queries do
   require CQEx
   require Logger
+  alias Astarte.RealmManagement.Realms.Interface
+  alias Astarte.RealmManagement
+  alias Astarte.RealmManagement.Repo
+  alias Astarte.RealmManagement.Astarte.Realm
+  alias Astarte.RealmManagement.Astarte.KvStore
   alias Astarte.Core.AstarteReference
   alias Astarte.Core.CQLUtils
   alias Astarte.RealmManagement.Config
@@ -41,6 +46,8 @@ defmodule Astarte.RealmManagement.Queries do
   alias CQEx.Query, as: DatabaseQuery
   alias CQEx.Result, as: DatabaseResult
   alias CQEx.Result.SchemaChanged
+
+  import Ecto.Query
 
   @max_batch_queries 32
 
@@ -209,41 +216,23 @@ defmodule Astarte.RealmManagement.Queries do
     end)
   end
 
-  def check_astarte_health(client, consistency) do
-    schema_statement = """
-      SELECT count(value)
-      FROM #{CQLUtils.realm_name_to_keyspace_name("astarte", Config.astarte_instance_id!())}.kv_store
-      WHERE group='astarte' AND key='schema_version'
-    """
+  def check_astarte_health(_client, consistency) do
+    keyspace = Realm.keyspace_name("astarte")
+
+    schema_query =
+      from KvStore,
+        where: [group: ~c"astarte", key: ~c"schema_version"]
 
     # no-op, just to check if nodes respond
     # no realm name can contain '_', '^'
-    realms_statement = """
-    SELECT *
-    FROM #{CQLUtils.realm_name_to_keyspace_name("astarte", Config.astarte_instance_id!())}.realms
-    WHERE realm_name='_invalid^name_'
-    """
-
-    schema_query =
-      DatabaseQuery.new()
-      |> DatabaseQuery.statement(schema_statement)
-      |> DatabaseQuery.consistency(consistency)
-
     realms_query =
-      DatabaseQuery.new()
-      |> DatabaseQuery.statement(realms_statement)
-      |> DatabaseQuery.consistency(consistency)
+      from RealmManagement.Astarte.Realm,
+        where: [realm_name: ~c"_invalid^name_"]
 
-    with {:ok, result} <- DatabaseQuery.call(client, schema_query),
-         ["system.count(value)": _count] <- DatabaseResult.head(result),
-         {:ok, _result} <- DatabaseQuery.call(client, realms_query) do
+    with {:ok, _} <- Repo.all(schema_query, prefix: keyspace, consistency: consistency),
+         {:ok, _} <- Repo.all(realms_query, prefix: keyspace, consistency: consistency) do
       :ok
     else
-      %{acc: _, msg: err_msg} ->
-        _ = Logger.warning("Health is not good: #{err_msg}.", tag: "health_check_bad")
-
-        {:error, :health_check_bad}
-
       {:error, err} ->
         _ =
           Logger.warning("Health is not good, reason: #{inspect(err)}.", tag: "health_check_bad")
@@ -761,29 +750,25 @@ defmodule Astarte.RealmManagement.Queries do
     end
   end
 
-  def interface_available_versions(client, interface_name) do
-    interface_versions_statement = """
-    SELECT major_version, minor_version
-    FROM interfaces
-    WHERE name = :interface_name
-    """
+  def interface_available_versions(realm_name, interface_name) do
+    keyspace = Realm.keyspace_name(realm_name)
 
-    query =
-      DatabaseQuery.new()
-      |> DatabaseQuery.statement(interface_versions_statement)
-      |> DatabaseQuery.put(:interface_name, interface_name)
-      |> DatabaseQuery.consistency(:quorum)
+    interface_versions_query =
+      from Interface,
+        select: [:major_version, :minor_version],
+        where: [name: ^interface_name]
 
-    with {:ok, result} <- DatabaseQuery.call(client, query),
-         [head | tail] <- Enum.to_list(result) do
-      {:ok, [head | tail]}
+    with [_head | _tail] = res <-
+           Repo.all(interface_versions_query, prefix: keyspace, consistency: :quorum) do
+      major_minor_mapping =
+        Enum.map(res, fn interface ->
+          [major_version: interface.major_version, minor_version: interface.minor_version]
+        end)
+
+      {:ok, major_minor_mapping}
     else
       [] ->
         {:error, :interface_not_found}
-
-      %{acc: _, msg: error_message} ->
-        _ = Logger.warning("Database error: #{error_message}.", tag: "db_error")
-        {:error, :database_error}
 
       {:error, reason} ->
         _ = Logger.warning("Database error: #{inspect(reason)}.", tag: "db_error")

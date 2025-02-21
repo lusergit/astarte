@@ -447,7 +447,7 @@ defmodule Astarte.RealmManagement.Engine do
     _ = Logger.debug("List interface versions.", interface: interface_name)
 
     with {:ok, client} <- Database.connect(realm: realm_name) do
-      Queries.interface_available_versions(client, interface_name)
+      Queries.interface_available_versions(realm_name, interface_name)
     else
       {:error, :database_connection_error} ->
         {:error, :realm_not_found}
