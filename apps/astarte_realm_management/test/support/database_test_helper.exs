@@ -514,8 +514,7 @@ defmodule Astarte.RealmManagement.DatabaseTestHelper do
         DatabaseFixtures.interfaces_object_values()
       )
 
-    keyspace_name =
-      CQLUtils.realm_name_to_keyspace_name(realm_name, Config.astarte_instance_id!())
+    keyspace_name = Realm.keyspace_name(realm_name)
 
     statement = """
       INSERT INTO #{keyspace_name}.interfaces
@@ -527,14 +526,16 @@ defmodule Astarte.RealmManagement.DatabaseTestHelper do
     Xandra.Cluster.execute!(:xandra, prepared, params, uuid_format: :binary)
   end
 
-  def create_object_datastream_table!(table_name) do
+  def create_object_datastream_table!(realm, table_name) do
+    keyspace = Realm.keyspace_name(realm)
+
     Xandra.Cluster.execute(
       :xandra,
-      "TRUNCATE TABLE #{CQLUtils.realm_name_to_keyspace_name(@test_realm, Config.astarte_instance_id!())}.#{table_name}"
+      "TRUNCATE TABLE #{realm}.#{table_name}"
     )
 
     Xandra.Cluster.execute!(:xandra, """
-        CREATE TABLE IF NOT EXISTS #{CQLUtils.realm_name_to_keyspace_name(@test_realm, Config.astarte_instance_id!())}.#{table_name} (
+        CREATE TABLE IF NOT EXISTS #{realm}.#{table_name} (
           device_id uuid,
           path varchar,
           PRIMARY KEY((device_id, path))
@@ -639,8 +640,7 @@ defmodule Astarte.RealmManagement.DatabaseTestHelper do
     %{realm_name: realm_name} =
       params = DatabaseFixtures.compute_generic_fixtures(opts, DatabaseFixtures.devices_values())
 
-    keyspace_name =
-      CQLUtils.realm_name_to_keyspace_name(realm_name, Config.astarte_instance_id!())
+    keyspace_name = Realm.keyspace_name(realm_name)
 
     Xandra.Cluster.run(:xandra, fn conn ->
       statement = """
@@ -661,9 +661,11 @@ defmodule Astarte.RealmManagement.DatabaseTestHelper do
       %{realm_name: realm_name} =
       DatabaseFixtures.compute_generic_fixtures(opts, DatabaseFixtures.realm_values())
 
+    keyspace = Realm.keyspace_name(realm_name)
+
     Xandra.Cluster.run(:xandra, fn conn ->
       device_registration_limit_statement = """
-      INSERT INTO #{CQLUtils.realm_name_to_keyspace_name("astarte", Config.astarte_instance_id!())}.realms
+      INSERT INTO #{keyspace}.realms
       (realm_name, device_registration_limit)
       VALUES (:realm_name, :device_registration_limit)
       """
@@ -674,7 +676,7 @@ defmodule Astarte.RealmManagement.DatabaseTestHelper do
       Xandra.execute!(conn, device_registration_limit_prepared, params)
 
       max_retention_statement = """
-      INSERT INTO #{CQLUtils.realm_name_to_keyspace_name(realm_name, Config.astarte_instance_id!())}.kv_store (group, key, value)
+      INSERT INTO #{keyspace}.kv_store (group, key, value)
       VALUES ('realm_config', 'datastream_maximum_storage_retention', intAsBlob(:datastream_maximum_storage_retention));
       """
 

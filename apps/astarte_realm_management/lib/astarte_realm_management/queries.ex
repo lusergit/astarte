@@ -54,7 +54,7 @@ defmodule Astarte.RealmManagement.Queries do
   import Ecto.Query
 
   defp create_one_object_columns_for_mappings(mappings) do
-    for %Mapping{endpoint: endpoint, value_type: value_type} <- mappings do
+    for %Mapping{endpoint: endpoint, type: value_type} <- mappings do
       column_name = CQLUtils.endpoint_to_db_column_name(endpoint)
       cql_type = CQLUtils.mapping_value_type_to_db_type(value_type)
       "#{column_name} #{cql_type}"
@@ -227,7 +227,7 @@ defmodule Astarte.RealmManagement.Queries do
     INSERT INTO #{keyspace}.#{table_name}
     (
       interface_id, endpoint_id, interface_name, interface_major_version, interface_minor_version,
-      interface_type, endpoint, value_type, reliability, retention, database_retention_policy,
+      interface_type, endpoint, type, reliability, retention, database_retention_policy,
       database_retention_ttl, expiry, allow_unset, explicit_timestamp, description, doc
     )
     VALUES (
@@ -237,17 +237,34 @@ defmodule Astarte.RealmManagement.Queries do
     )
     """
 
+    reliability =
+      case interface_type do
+        :properties -> nil
+        :datastream -> Reliability.to_int(mapping.reliability)
+      end
+
+    retention =
+      case interface_type do
+        :properties -> nil
+        :datastream -> Retention.to_int(mapping.retention)
+      end
+
+    endpoint_id =
+      if mapping.endpoint_id,
+        do: mapping.endpoint_id,
+        else: CQLUtils.endpoint_id(interface_name, major, mapping.endpoint)
+
     params = [
       interface_id,
-      mapping.endpoint_id,
+      endpoint_id,
       interface_name,
       major,
       minor,
       InterfaceType.to_int(interface_type),
       mapping.endpoint,
-      ValueType.to_int(mapping.value_type),
-      Reliability.to_int(mapping.reliability),
-      Retention.to_int(mapping.retention),
+      ValueType.to_int(mapping.type),
+      reliability,
+      retention,
       DatabaseRetentionPolicy.to_int(mapping.database_retention_policy),
       mapping.database_retention_ttl,
       mapping.expiry,

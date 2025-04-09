@@ -148,7 +148,8 @@ defmodule Astarte.RealmManagement.DatabaseFixtures do
     %{
       realm_name: fixtures[:realm_name],
       object_name: fixtures[:device_alias],
-      object_uuid: fixtures[:device_id]
+      object_uuid: fixtures[:device_id],
+      object_type:
     }
   end
 
