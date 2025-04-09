@@ -1,7 +1,7 @@
 #
 # This file is part of Astarte.
 #
-# Copyright 2017 Ispirata Srl
+# Copyright 2025 SECO Mind Srl
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +15,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 
-ExUnit.start()
+defmodule Astarte.RealmManagement.JWTPublicKeyFixtures do
+  @moduledoc """
+  Proveds fixtures for the JWT public key
+  """
 
-(Path.wildcard("./test/support/**/*.ex") ++ Path.wildcard("./test/support/**/*.exs"))
-|> Enum.each(&Code.require_file/1)
+  @jwt_public_key_pem """
+  -----BEGIN PUBLIC KEY-----
+  MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAE7u5hHn9oE9uy5JoUjwNU6rSEgRlAFh5e
+  u9/f1dNImWDuIPeLu8nEiuHlCMy02+YDu0wN2U1psPC7w6AFjv4uTg==
+  -----END PUBLIC KEY-----
+  """
+
+  def jwt_public_key_pem() do
+    @jwt_public_key_pem
+  end
+end
