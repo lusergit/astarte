@@ -120,7 +120,7 @@ defmodule Astarte.Test.Helpers.Database do
     interface_minor_version int,
     interface_type int,
     endpoint ascii,
-    value_type int,
+    type int,
     reliability int,
     retention int,
     expiry int,
