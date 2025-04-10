@@ -17,19 +17,50 @@
 #
 
 defmodule Astarte.RealmManagement.EngineTest do
+  alias Astarte.RealmManagement.Queries
   alias Astarte.RealmManagement.Engine
   use Astarte.RealmManagement.DataCase
   use ExUnitProperties
 
   describe "Test interface" do
     property "is installed properly", %{realm: realm} do
-      gen all(interface <- Astarte.Core.Generators.Interface.interface()) do
+      check all(interface <- Astarte.Core.Generators.Interface.interface()) do
         json_interface = Jason.encode!(interface)
 
         _ = Engine.install_interface(realm, json_interface)
 
         {:ok, interfaces} = Engine.get_interfaces_list(realm)
         assert interface.name in interfaces
+      end
+    end
+
+    property "does not get deleted if major version is not 0", %{realm: realm} do
+      check all(
+              interface <-
+                Astarte.Core.Generators.Interface.interface(major_version: integer(1..9))
+            ) do
+        json_interface = Jason.encode!(interface)
+
+        _ = Engine.install_interface(realm, json_interface)
+
+        assert {:error, :forbidden} =
+                 Engine.delete_interface(realm, interface.name, interface.major_version)
+
+        {:ok, interfaces} = Engine.get_interfaces_list(realm)
+        assert interface.name in interfaces
+      end
+    end
+
+    property "is deleted if the major version is 0", %{realm: realm} do
+      check all(interface <- Astarte.Core.Generators.Interface.interface(major_version: 0)) do
+        json_interface = Jason.encode!(interface)
+
+        _ = Engine.install_interface(realm, json_interface)
+        {:ok, interfaces} = Engine.get_interfaces_list(realm)
+
+        assert :ok = Engine.delete_interface(realm, interface.name, interface.major_version)
+        {:ok, interfaces} = Engine.get_interfaces_list(realm)
+        refute interface.name in interfaces
       end
     end
   end
