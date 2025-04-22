@@ -38,6 +38,8 @@ defmodule Astarte.RealmManagement.InterfacesTest do
         {:ok, fetched_interface} =
           Queries.fetch_interface(realm, interface.name, interface.major_version)
 
+        _ = Queries.delete_interface(realm, interface.name, interface.major_version)
+
         assert interface.name == fetched_interface.name
         assert interface.major_version == fetched_interface.major_version
         assert interface.minor_version == fetched_interface.minor_version
@@ -57,8 +59,6 @@ defmodule Astarte.RealmManagement.InterfacesTest do
           |> MapSet.new()
 
         assert MapSet.equal?(fetched_mappings, interface_mappings)
-
-        _ = Queries.delete_interface(realm, interface.name, interface.major_version)
       end
     end
 
