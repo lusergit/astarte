@@ -38,6 +38,8 @@ defmodule Astarte.RealmManagement.Engine do
   alias Astarte.RealmManagement.Engine.MappingUpdates
   alias Astarte.RealmManagement.Queries
 
+  @task Application.compile_env(:astarte_realm_management, :task_module, Task)
+
   def install_interface(realm_name, interface_json, opts \\ []) do
     _ = Logger.info("Going to install a new interface.", tag: "install_interface")
 
@@ -60,7 +62,7 @@ defmodule Astarte.RealmManagement.Engine do
 
       if opts[:async] do
         # TODO: add _ = Logger.metadata(realm: realm_name)
-        Task.start(Queries, :install_new_interface, [realm_name, interface_doc, automaton])
+        @task.start(Queries, :install_new_interface, [realm_name, interface_doc, automaton])
 
         {:ok, :started}
       else
@@ -116,7 +118,8 @@ defmodule Astarte.RealmManagement.Engine do
            {:interface_avail, Queries.is_interface_major_available?(realm_name, name, major)},
          {:ok, installed_interface} <-
            Interface.fetch_interface_descriptor(realm_name, name, major),
-         :ok <- error_on_incompatible_descriptor(installed_interface, interface_descriptor),
+         :ok <-
+           error_on_incompatible_descriptor(installed_interface, interface_descriptor),
          :ok <- error_on_downgrade(installed_interface, interface_descriptor),
          {:ok, mapping_updates} <- extract_mapping_updates(realm_name, interface_doc),
          {:ok, automaton} <- EndpointsAutomaton.build(interface_doc.mappings) do
@@ -127,7 +130,7 @@ defmodule Astarte.RealmManagement.Engine do
 
       if opts[:async] do
         # TODO: add _ = Logger.metadata(realm: realm_name)
-        Task.start_link(__MODULE__, :execute_interface_update, [
+        @task.start_link(__MODULE__, :execute_interface_update, [
           realm_name,
           interface_update,
           mapping_updates,
@@ -357,7 +360,7 @@ defmodule Astarte.RealmManagement.Engine do
            {:triggers, Queries.has_interface_simple_triggers?(realm_name, interface_id)} do
       if opts[:async] do
         # TODO: add _ = Logger.metadata(realm: realm_name)
-        Task.start_link(Engine, :execute_interface_deletion, [realm_name, name, major])
+        @task.start_link(Engine, :execute_interface_deletion, [realm_name, name, major])
 
         {:ok, :started}
       else
@@ -772,7 +775,7 @@ defmodule Astarte.RealmManagement.Engine do
         |> PolicyProto.encode()
 
       if opts[:async] do
-        Task.start(Queries, :install_new_trigger_policy, [realm_name, policy_name, policy_proto])
+        @task.start(Queries, :install_new_trigger_policy, [realm_name, policy_name, policy_proto])
 
         {:ok, :started}
       else
@@ -846,7 +849,7 @@ defmodule Astarte.RealmManagement.Engine do
     with :ok <- verify_trigger_policy_exists(realm_name, policy_name),
          {:ok, false} <- check_trigger_policy_has_triggers(realm_name, policy_name) do
       if opts[:async] do
-        Task.start_link(Engine, :execute_trigger_policy_deletion, [realm_name, policy_name])
+        @task.start_link(Engine, :execute_trigger_policy_deletion, [realm_name, policy_name])
 
         {:ok, :started}
       else

@@ -19,21 +19,39 @@
 #
 
 defmodule Astarte.RealmManagement.InterfacesTest do
+  alias Astarte.DataAccess.Realms.Interface
+  alias Astarte.DataAccess.Realms.Realm
+  alias Astarte.DataAccess.Repo
   alias Astarte.RealmManagement.Queries
   alias Astarte.RealmManagement.Engine
 
   use Astarte.RealmManagement.DataCase, async: true
   use ExUnitProperties
+  use Mimic
+
+  require Ecto.Query
 
   describe "Test interface" do
     @describetag :interfaces
 
     @tag :creation
     property "is installed properly", %{realm: realm} do
-      check all(interface <- Astarte.Core.Generators.Interface.interface()) do
+      check all interface <- Astarte.Core.Generators.Interface.interface(),
+                async <- boolean() do
         json_interface = Jason.encode!(interface)
 
-        :ok = Engine.install_interface(realm, json_interface)
+        if async do
+          expect(Task, :start, fn Queries, :install_new_interface, [^realm, doc, automaton] ->
+            Queries.install_new_interface(realm, doc, automaton)
+          end)
+        end
+
+        res = Engine.install_interface(realm, json_interface, async: async)
+
+        case async do
+          true -> {:ok, :started} = res
+          false -> :ok = res
+        end
 
         {:ok, fetched_interface} =
           Queries.fetch_interface(realm, interface.name, interface.major_version)
@@ -64,16 +82,17 @@ defmodule Astarte.RealmManagement.InterfacesTest do
 
     @tag :deletion
     property "does not get deleted if major version is not 0", %{realm: realm} do
-      check all(
-              interface <-
-                Astarte.Core.Generators.Interface.interface(major_version: integer(1..9))
-            ) do
+      check all interface <-
+                  Astarte.Core.Generators.Interface.interface(major_version: integer(1..9)),
+                async <- boolean() do
         json_interface = Jason.encode!(interface)
 
         _ = Engine.install_interface(realm, json_interface)
 
         assert {:error, :forbidden} =
-                 Engine.delete_interface(realm, interface.name, interface.major_version)
+                 Engine.delete_interface(realm, interface.name, interface.major_version,
+                   async: async
+                 )
 
         interfaces = Engine.get_interfaces_list(realm)
         assert interface.name in interfaces
@@ -82,12 +101,30 @@ defmodule Astarte.RealmManagement.InterfacesTest do
 
     @tag :deletion
     property "is deleted if the major version is 0", %{realm: realm} do
-      check all(interface <- Astarte.Core.Generators.Interface.interface(major_version: 0)) do
+      check all interface <- Astarte.Core.Generators.Interface.interface(major_version: 0),
+                async <- boolean() do
         json_interface = Jason.encode!(interface)
+        name = interface.name
+        major = interface.major_version
 
         _ = Engine.install_interface(realm, json_interface)
 
-        assert :ok = Engine.delete_interface(realm, interface.name, interface.major_version)
+        if async do
+          expect(Task, :start_link, fn Engine,
+                                       :execute_interface_deletion,
+                                       [^realm, ^name, ^major] ->
+            Engine.execute_interface_deletion(realm, name, major)
+          end)
+        end
+
+        res =
+          Engine.delete_interface(realm, interface.name, interface.major_version, async: async)
+
+        case async do
+          true -> {:ok, :started} = res
+          false -> :ok = res
+        end
+
         interfaces = Engine.get_interfaces_list(realm)
         refute interface.name in interfaces
       end
@@ -116,26 +153,60 @@ defmodule Astarte.RealmManagement.InterfacesTest do
 
     @tag :update
     property "is updated with valid update", %{realm: realm} do
-      check all(
-              interface <-
-                Astarte.Core.Generators.Interface.interface(minor_version: integer(1..254)),
-              valid_update_interface <-
-                Astarte.Core.Generators.Interface.interface(
-                  name: interface.name,
-                  major_version: interface.major_version,
-                  minor_version: integer((interface.minor_version + 1)..255),
-                  type: interface.type,
-                  ownership: interface.ownership,
-                  aggregation: interface.aggregation,
-                  interface_id: interface.interface_id,
-                  mappings: interface.mappings
-                )
-            ) do
+      check all interface <-
+                  Astarte.Core.Generators.Interface.interface(minor_version: integer(1..254)),
+                valid_update_interface <-
+                  Astarte.Core.Generators.Interface.interface(
+                    name: interface.name,
+                    major_version: interface.major_version,
+                    minor_version: integer((interface.minor_version + 1)..255),
+                    type: interface.type,
+                    ownership: interface.ownership,
+                    aggregation: interface.aggregation,
+                    interface_id: interface.interface_id,
+                    mappings: interface.mappings
+                  ),
+                async <- boolean() do
+        keyspace = Realm.keyspace_name(realm)
+
+        Ecto.Query.from(i in Interface,
+          where: i.name == ^interface.name
+        )
+        |> Repo.delete_all(prefix: keyspace)
+
         json_interface = Jason.encode!(interface)
         json_updated_interface = Jason.encode!(valid_update_interface)
 
         _ = Engine.install_interface(realm, json_interface)
-        :ok = Engine.update_interface(realm, json_updated_interface)
+
+        if async do
+          expect(Task, :start_link, fn Engine,
+                                       :execute_interface_update,
+                                       [
+                                         ^realm,
+                                         interface_update,
+                                         mapping_updates,
+                                         automaton,
+                                         desc,
+                                         doc
+                                       ] ->
+            Engine.execute_interface_update(
+              realm,
+              interface_update,
+              mapping_updates,
+              automaton,
+              desc,
+              doc
+            )
+          end)
+        end
+
+        res = Engine.update_interface(realm, json_updated_interface, async: async)
+
+        case async do
+          true -> {:ok, :started} = res
+          false -> :ok = res
+        end
 
         {:ok, interface} =
           Queries.fetch_interface(realm, interface.name, interface.major_version)

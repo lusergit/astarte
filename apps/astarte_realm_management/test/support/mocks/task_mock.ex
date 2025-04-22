@@ -1,7 +1,7 @@
 #
 # This file is part of Astarte.
 #
-# Copyright 2017 Ispirata Srl
+# Copyright 2025 SECO Mind Srl
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,10 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 
-Mimic.copy(Astarte.DataAccess.Config)
-Mimic.copy(Astarte.RealmManagement.DeviceRemoval.Core)
-Mimic.copy(Task.Supervisor)
-Mimic.copy(Astarte.RealmManagement.TaskMock)
+defmodule Astarte.RealmManagement.TaskMock do
+  @moduledoc """
+  Mock module to replicate what we need of the elixir `task` module. This cannot
+  be directly copied by mimic as our test facilities use it to build coverage reports.
+  """
 
-ExUnit.start(capture_log: true)
+  def start(_module, _function, _args) do
+  end
+
+  def start_link(_module, _function, _args) do
+  end
+end

@@ -46,7 +46,8 @@ defmodule Astarte.RealmManagement.DeviceRemoval.Scheduler do
   end
 
   def handle_info(:delete_devices, state) do
-    _ = Logger.debug("Reconciling devices to delete")
+    _ =
+      Logger.debug("Reconciling devices to delete")
 
     start_device_deletion!()
     schedule_device_deletion()
@@ -75,7 +76,8 @@ defmodule Astarte.RealmManagement.DeviceRemoval.Scheduler do
   end
 
   defp retrieve_devices_to_delete!() do
-    realms = Queries.retrieve_realms!()
+    realms =
+      Queries.retrieve_realms!()
 
     Enum.flat_map(realms, fn %{realm_name: realm_name} ->
       devices = Queries.retrieve_devices_to_delete!(realm_name)

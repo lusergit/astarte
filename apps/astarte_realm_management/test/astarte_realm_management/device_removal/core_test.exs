@@ -225,7 +225,7 @@ defmodule Astarte.RealmManagement.DeviceRemover.CoreTest do
     }
     |> Repo.insert!(prefix: keyspace)
 
-    _ = Queries.delete_interface(realm, interface.name, interface.major_version)
+    on_exit(fn -> _ = Queries.delete_interface(realm, interface.name, interface.major_version) end)
   end
 
   # Custom generators
