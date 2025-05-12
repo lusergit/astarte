@@ -182,7 +182,7 @@ defmodule Astarte.Helpers.Device do
     similar?(result, value)
   end
 
-  def valid_result?(result, _interface, value) when is_map(result) do
+  def valid_result?(result, _interface, value) when is_map(result) and is_map(value) do
     Map.intersect(value, result)
     |> Enum.all?(fn {key, result_value} -> similar?(result_value, Map.fetch!(value, key)) end)
   end
@@ -191,7 +191,33 @@ defmodule Astarte.Helpers.Device do
     Enum.any?(result, &valid_result?(&1, interface, value))
   end
 
+  def valid_result?(result, interface, value) do
+    similar?(result, value)
+  end
+
   defp similar?(nil = _result, [] = _value), do: true
+  defp similar?("" = _result, nil = _value), do: true
+  defp similar?(result, result), do: true
+  defp similar?(result, [result]), do: true
+  defp similar?([result], [result]), do: true
+  defp similar?([result], result), do: true
+
+  defp similar?(%{"" => nil} = _result, [] = _value), do: true
+
+  defp similar?([~U[1970-01-01 00:00:00.000Z]], [0]), do: true
+  defp similar?(~U[1970-01-01 00:00:00.000Z], 0), do: true
+  defp similar?([~U[1970-01-01 00:00:00.000Z]], 0), do: true
+  defp similar?(~U[1970-01-01 00:00:00.000Z], [0]), do: true
+  defp similar?([%DateTime{} = date], [date2]), do: DateTime.to_string(date) == date2
+  defp similar?(%DateTime{} = date, [date2]), do: DateTime.to_string(date) == date2
+  defp similar?([%DateTime{} = date], date2), do: DateTime.to_string(date) == date2
+  defp similar?(%DateTime{} = date, date2), do: DateTime.to_string(date) == date2
+  defp similar?([%{"timestamp" => _, "value" => ~U[1970-01-01 00:00:00.000Z]}], 0), do: true
+  defp similar?([%{"timestamp" => _, "value" => value}], value), do: true
+  defp similar?(%{"timestamp" => _, "value" => value}, value), do: true
+
+  defp similar?(%{"timestamp" => _, "value" => result}, value) when is_binary(result),
+    do: result == to_string(value)
 
   defp similar?(result, value) when is_binary(result) and is_number(value),
     do: result == to_string(value)
