@@ -125,11 +125,15 @@ defmodule Astarte.Helpers.Device do
       valid_remote_matches(local_matches, interface.type, mapping_update.reliability)
       |> Enum.at(0)
 
-    Mox.expect(Astarte.AppEngine.API.RPC.VMQPlugin.ClientMock, :publish, fn args ->
-      validation_function.(args)
+    Mox.expect(
+      Astarte.AppEngine.API.RPC.VMQPlugin.ClientMock,
+      :publish,
+      fn args ->
+        validation_function.(args)
 
-      {:ok, %{local_matches: local_matches, remote_matches: remote_matches}}
-    end)
+        {:ok, %{local_matches: local_matches, remote_matches: remote_matches}}
+      end
+    )
   end
 
   def is_fallible?(interface) do
@@ -187,6 +191,15 @@ defmodule Astarte.Helpers.Device do
     |> Enum.all?(fn {key, result_value} -> similar?(result_value, Map.fetch!(value, key)) end)
   end
 
+  def valid_result?(result, _interface, value) when is_map(result) do
+    similar?(result, value)
+  end
+
+  def valid_result?(result, interface, value) when is_list(result) and is_list(value) do
+    [result | _] = result
+    valid_result?(result, interface, value)
+  end
+
   def valid_result?(result, interface, value) when is_list(result) do
     Enum.any?(result, &valid_result?(&1, interface, value))
   end
@@ -195,29 +208,122 @@ defmodule Astarte.Helpers.Device do
     similar?(result, value)
   end
 
-  defp similar?(nil = _result, [] = _value), do: true
+  defp similar?(nil, []), do: true
+  defp similar?(%{} = _result, nil = _value), do: true
   defp similar?("" = _result, nil = _value), do: true
-  defp similar?(result, result), do: true
-  defp similar?(result, [result]), do: true
-  defp similar?([result], [result]), do: true
-  defp similar?([result], result), do: true
+  defp similar?(%{"" => nil}, nil), do: true
+  defp similar?(%{"" => nil}, []), do: true
 
   defp similar?(%{"" => nil} = _result, [] = _value), do: true
+  defp similar?(nil = _result, [] = _value), do: true
 
-  defp similar?([~U[1970-01-01 00:00:00.000Z]], [0]), do: true
-  defp similar?(~U[1970-01-01 00:00:00.000Z], 0), do: true
-  defp similar?([~U[1970-01-01 00:00:00.000Z]], 0), do: true
-  defp similar?(~U[1970-01-01 00:00:00.000Z], [0]), do: true
-  defp similar?([%DateTime{} = date], [date2]), do: DateTime.to_string(date) == date2
-  defp similar?(%DateTime{} = date, [date2]), do: DateTime.to_string(date) == date2
-  defp similar?([%DateTime{} = date], date2), do: DateTime.to_string(date) == date2
-  defp similar?(%DateTime{} = date, date2), do: DateTime.to_string(date) == date2
-  defp similar?([%{"timestamp" => _, "value" => ~U[1970-01-01 00:00:00.000Z]}], 0), do: true
-  defp similar?([%{"timestamp" => _, "value" => value}], value), do: true
-  defp similar?(%{"timestamp" => _, "value" => value}, value), do: true
+  defp similar?(
+         %{"reception_timestamp" => _, "timestamp" => _, "value" => %DateTime{} = date},
+         %DateTime{} = date2
+       ),
+       do: date == date2
+
+  defp similar?(
+         %{"reception_timestamp" => _, "timestamp" => _, "value" => [%DateTime{} = date]},
+         [%DateTime{} = date2]
+       ),
+       do: date == date2
+
+  defp similar?(
+         %{"reception_timestamp" => _, "timestamp" => _, "value" => [%DateTime{} = date]},
+         %DateTime{} = date2
+       ),
+       do: date == date2
+
+  defp similar?(
+         %{"reception_timestamp" => _, "timestamp" => _, "value" => %DateTime{} = date},
+         [%DateTime{} = date2]
+       ),
+       do: date == date2
+
+  defp similar?(
+         %{"reception_timestamp" => _, "timestamp" => _, "value" => val},
+         val
+       ),
+       do: true
+
+  defp similar?(
+         %{"reception_timestamp" => _, "timestamp" => _, "value" => [val]},
+         val
+       ),
+       do: true
+
+  defp similar?(
+         %{"reception_timestamp" => _, "timestamp" => _, "value" => [val]},
+         [val]
+       ),
+       do: true
+
+  defp similar?(
+         %{"reception_timestamp" => _, "timestamp" => _, "value" => val},
+         [val]
+       ),
+       do: true
+
+  defp similar?(%DateTime{} = datetime, timestamp)
+       when is_integer(timestamp),
+       do: DateTime.to_unix(datetime) == timestamp
+
+  defp similar?(%{"timestamp" => _, "value" => %DateTime{} = date}, date2),
+    do: DateTime.to_string(date) == date2
+
+  defp similar?(%{"timestamp" => _, "value" => %DateTime{} = date}, %DateTime{} = date2),
+    do: date == date2
+
+  defp similar?(%{"timestamp" => _, "value" => [%DateTime{} = date]}, [date2]),
+    do: DateTime.to_string(date) == date2
+
+  defp similar?(%{"timestamp" => _, "value" => [%DateTime{} = date]}, date2),
+    do: DateTime.to_string(date) == date2
+
+  defp similar?(%{"timestamp" => _, "value" => %DateTime{} = date}, [date2]),
+    do: DateTime.to_string(date) == date2
+
+  defp similar?(%{"timestamp" => _, "value" => ~U[1970-01-01 00:00:00.000Z]}, 0),
+    do: true
+
+  defp similar?(%{"timestamp" => _, "value" => [~U[1970-01-01 00:00:00.000Z]]}, [0]),
+    do: true
+
+  defp similar?(%{"timestamp" => _, "value" => [~U[1970-01-01 00:00:00.000Z]]}, 0),
+    do: true
+
+  defp similar?(%{"timestamp" => _, "value" => ~U[1970-01-01 00:00:00.000Z]}, [0]),
+    do: true
+
+  defp similar?(%{"timestamp" => _, "value" => nil}, []), do: true
+  defp similar?([%{"timestamp" => _, "value" => nil} | _], []), do: true
+
+  defp similar?(%{"timestamp" => _, "value" => [result]}, [value]) when is_binary(result),
+    do: result == to_string(value)
+
+  defp similar?(%{"timestamp" => _, "value" => [result]}, [value]), do: result == value
+
+  defp similar?(%{"timestamp" => _, "value" => result}, value)
+       when is_binary(result) and is_binary(value),
+       do: result == value
+
+  defp similar?([%{"timestamp" => _, "value" => result} | _], value)
+       when is_binary(result) and is_binary(value),
+       do: result == value
+
+  defp similar?([%{"timestamp" => _, "value" => result} | _], value) when is_binary(result),
+    do: result == to_string(value)
 
   defp similar?(%{"timestamp" => _, "value" => result}, value) when is_binary(result),
     do: result == to_string(value)
+
+  defp similar?(%{"timestamp" => _, "value" => result}, value)
+       when is_binary(result) and is_binary(value),
+       do: result == value
+
+  defp similar?(%{"timestamp" => _, "value" => result}, value), do: result == value
+  defp similar?([%{"timestamp" => _, "value" => result} | _], value), do: result == value
 
   defp similar?(result, value) when is_binary(result) and is_number(value),
     do: result == to_string(value)
