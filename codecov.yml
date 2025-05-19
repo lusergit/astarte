@@ -12,6 +12,9 @@ coverage:
         branches:
           - "!master"
 
+ignore:
+  - "apps/*/test"
+
 comment:
   layout: "header, diff, files, components"
   require_changes: yes
