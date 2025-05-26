@@ -111,6 +111,7 @@ defmodule Astarte.AppEngine.API.Mixfile do
       {:castore, "~> 1.0.0"},
       {:observer_cli, "~> 1.5"},
       {:dialyxir, "~> 1.0", only: [:dev, :ci], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:libcluster, "~> 3.3"},
       {:horde, "~> 0.9"},
       # Workaround for Elixir 1.15 / ssl_verify_fun issue
