@@ -85,6 +85,7 @@ defmodule Astarte.Housekeeping.Mixfile do
       {:xandra, "~> 0.13"},
       {:excoveralls, "~> 0.15", only: :test},
       {:dialyxir, "~> 1.0", only: [:dev, :ci], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:plug_cowboy, "~> 2.1"},
       {:skogsra, "~> 2.2"},
       {:pretty_log, "~> 0.1"},
