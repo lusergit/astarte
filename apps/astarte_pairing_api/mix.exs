@@ -92,6 +92,7 @@ defmodule Astarte.Pairing.API.Mixfile do
       {:pretty_log, "~> 0.1"},
       {:plug_logger_with_meta, "~> 0.1"},
       {:dialyxir, "~> 1.0", only: [:dev, :ci], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:skogsra, "~> 2.2"},
       {:cors_plug, "~> 2.0"},
       {:telemetry_metrics, "~> 0.4"},
