@@ -99,6 +99,7 @@ defmodule Astarte.TriggerEngine.Mixfile do
       # This fork is supporting amqp ~> 2.0 and also ~> 3.0.
       {:ex_rabbit_pool, github: "leductam/ex_rabbit_pool"},
       {:dialyxir, "~> 1.0", only: [:dev, :ci], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.15", only: :test},
       {:mox, "~> 0.5", only: :test},
       {:mimic, "~> 1.11", only: :test},
