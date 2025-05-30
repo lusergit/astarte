@@ -19,6 +19,7 @@
 #
 
 defmodule Astarte.DataUpdaterPlant.DataUpdater.NewTest do
+  alias Astarte.DataUpdaterPlant.Config.ClusteringStrategy
   use ExUnit.Case, async: true
 
   test "This is a test!" do
@@ -27,5 +28,10 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.NewTest do
 
   test "another test here!" do
     refute false
+  end
+
+  test "clustering strategies" do
+    assert {:ok, "kubernetes"} = ClusteringStrategy.cast("kubernetes")
+    assert :error = ClusteringStrategy.cast("invalid_strategy")
   end
 end
