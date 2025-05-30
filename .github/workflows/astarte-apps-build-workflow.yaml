@@ -136,7 +136,9 @@ jobs:
         CFSSL_API_URL: http://localhost:${{ job.services.cfssl.ports[8080] }}
     - name: Upload Coverage Results to CodeCov
       # Don't upload more than once per component
-      if: matrix.database == 'scylladb/scylla:5.2.2'
+      if: |
+          matrix.database == 'scylladb/scylla:5.2.2' &&
+          ${{ github.repository }} == astarte-platform/astarte
       uses: codecov/codecov-action@v4
       with:
         fail_ci_if_error: true
