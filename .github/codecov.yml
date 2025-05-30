@@ -10,15 +10,32 @@ coverage:
         threshold: 1%
         branches:
           - "!master"
+      AppEngine API:
         flags:
           - astarte_appengine_api
+      DataUpdaterPlant:
+        flags:
           - astarte_data_updater_plant
+      Housekeeping:
+        flags:
           - astarte_housekeeping
+      Housekeeping API:
+        flags:
           - astarte_housekeeping_api
+      Pairing:
+        flags:
           - astarte_pairing
+      Pairing API:
+        flags:
           - astarte_pairing_api
+      Realm Management:
+        flags:
           - astarte_realm_management
+      Realm Management API:
+        flags:
           - astarte_realm_management_api
+      Trigger Engine:
+        flags:
           - astarte_trigger_engine
 
 ignore:
