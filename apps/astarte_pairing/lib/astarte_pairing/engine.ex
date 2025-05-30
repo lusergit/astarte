@@ -134,6 +134,7 @@ defmodule Astarte.Pairing.Engine do
          secret_hash <- CredentialsSecret.hash(credentials_secret),
          {:ok, _device} <-
            Queries.register_device(realm, device_id, hardware_id, secret_hash, opts) do
+      Logger.debug("Device registered!")
       {:ok, credentials_secret}
     else
       {:error, :shutdown} ->
