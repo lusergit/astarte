@@ -52,7 +52,8 @@ defmodule Astarte.RealmManagement.Engine do
          :ok <- Queries.check_interface_name_collision(realm_name, name),
          {:ok, automaton} <- EndpointsAutomaton.build(interface_doc.mappings) do
       _ =
-        Logger.info("Installing interface.",
+        Logger.info(
+          "Installing a new interface in realm #{realm_name}: #{inspect(interface_doc)}",
           interface: name,
           interface_major: major,
           tag: "install_interface_started"
