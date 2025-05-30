@@ -24,4 +24,8 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.NewTest do
   test "This is a test!" do
     assert true
   end
+
+  test "another test here!" do
+    refute false
+  end
 end
