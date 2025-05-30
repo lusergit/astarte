@@ -458,6 +458,10 @@ defmodule Astarte.Pairing.EngineTest do
       assert first_credentials_request_timestamp ==
                credentials_requested_again_device.first_credentials_request
     end
+
+    test "fake test" do
+      assert true
+    end
   end
 
   defp seed_devices(_context) do
