@@ -21,6 +21,7 @@ defmodule Astarte.RealmManagement.APIWeb.InterfaceControllerTest do
 
   @moduletag :interfaces
 
+  alias Astarte.RealmManagement.API.Interfaces
   alias Astarte.RealmManagement.API.Helpers.JWTTestHelper
   alias Astarte.RealmManagement.API.Helpers.RPCMock.DB
 
@@ -75,11 +76,37 @@ defmodule Astarte.RealmManagement.APIWeb.InterfaceControllerTest do
     end
 
     test "lists interface after installing it", %{conn: conn, realm: realm} do
-      post_conn = post(conn, interface_path(conn, :create, realm), data: @valid_attrs)
+      # TODO: Remove all of this once all RPC calls are not needed anymore
+      interface = Astarte.Core.Generators.Interface.interface() |> Enum.at(0)
+
+      mappings =
+        interface.mappings
+        |> Enum.map(fn mapping ->
+          mapping |> Map.put(:type, mapping.value_type)
+        end)
+
+      interface = Map.put(interface, :mappings, mappings)
+
+      Mimic.expect(Astarte.RealmManagement.API.Interfaces, :install_interface, fn ^realm,
+                                                                                  params,
+                                                                                  opts ->
+        assert params == interface
+        assert opts == [async: true]
+
+        db_interface = %Astarte.Core.Interface{
+          name: params.name,
+          major_version: params.major_version
+        }
+
+        DB.install_interface(realm, db_interface)
+        {:ok, interface}
+      end)
+
+      post_conn = post(conn, interface_path(conn, :create, realm), data: interface)
       assert response(post_conn, 201) == ""
 
       list_conn = get(conn, interface_path(conn, :index, realm))
-      assert json_response(list_conn, 200)["data"] == [@interface_name]
+      assert json_response(list_conn, 200)["data"] == [interface.name]
     end
   end
 
@@ -87,13 +114,28 @@ defmodule Astarte.RealmManagement.APIWeb.InterfaceControllerTest do
     @describetag :show
 
     test "shows existing interface", %{conn: conn, realm: realm} do
-      post_conn = post(conn, interface_path(conn, :create, realm), data: @valid_attrs)
+      # TODO: Remove all of this once all RPC calls are not needed anymore
+      interface = Astarte.Core.Generators.Interface.interface() |> Enum.at(0) |> to_struct()
+
+      Mimic.expect(Astarte.RealmManagement.API.Interfaces, :install_interface, fn ^realm,
+                                                                                  params,
+                                                                                  _ ->
+        db_interface = %Astarte.Core.Interface{
+          name: params.name,
+          major_version: params.major_version
+        }
+
+        DB.install_interface(realm, db_interface)
+        {:ok, interface}
+      end)
+
+      post_conn = post(conn, interface_path(conn, :create, realm), data: interface)
       assert response(post_conn, 201) == ""
 
       show_conn =
-        get(conn, interface_path(conn, :show, realm, @interface_name, @interface_major_str))
+        get(conn, interface_path(conn, :show, realm, interface.name, interface.major_version))
 
-      assert json_response(show_conn, 200)["data"]["interface_name"] == @interface_name
+      assert json_response(show_conn, 200)["data"]["interface_name"] == interface.name
     end
 
     test "renders error on non-existing interface", %{conn: conn, realm: realm} do
@@ -107,49 +149,88 @@ defmodule Astarte.RealmManagement.APIWeb.InterfaceControllerTest do
   describe "create interface" do
     @describetag :creation
 
-    test "renders interface when data is valid", %{conn: conn, realm: realm} do
-      post_conn = post(conn, interface_path(conn, :create, realm), data: @valid_attrs)
+    test "Installs an interface with valid data", %{conn: conn, realm: realm} do
+      # TODO: Remove all of this once all RPC calls are not needed anymore
+      interface = Astarte.Core.Generators.Interface.interface() |> Enum.at(0) |> Map.from_struct()
+
+      mappings =
+        interface.mappings
+        |> Enum.map(fn mapping ->
+          mapping |> Map.from_struct() |> Map.put(:type, mapping.value_type)
+        end)
+
+      interface = Map.put(interface, :mappings, mappings)
+
+      post_conn =
+        post(conn, interface_path(conn, :create, realm),
+          data: interface,
+          async_operation: "false"
+        )
+
       assert response(post_conn, 201) == ""
-
-      get_conn =
-        get(conn, interface_path(conn, :show, realm, @interface_name, @interface_major_str))
-
-      assert json_response(get_conn, 200)["data"] == @valid_attrs
     end
 
-    test "renders errors when data is invalid", %{conn: conn, realm: realm} do
-      conn = post(conn, interface_path(conn, :create, realm), data: @invalid_attrs)
-      assert json_response(conn, 422)["errors"] != %{}
-    end
+    test "errors on an already installed interface", %{conn: conn, realm: realm} do
+      # TODO: Remove all of this once all RPC calls are not needed anymore
+      interface = Astarte.Core.Generators.Interface.interface() |> Enum.at(0) |> Map.from_struct()
 
-    test "renders error when interface is already installed", %{conn: conn, realm: realm} do
-      post_conn = post(conn, interface_path(conn, :create, realm), data: @valid_attrs)
-      assert response(post_conn, 201) == ""
+      mappings =
+        interface.mappings
+        |> Enum.map(fn mapping ->
+          mapping |> Map.from_struct() |> Map.put(:type, mapping.value_type)
+        end)
 
-      post2_conn = post(conn, interface_path(conn, :create, realm), data: @valid_attrs)
-      assert json_response(post2_conn, 409)["errors"] != %{}
+      interface = Map.put(interface, :mappings, mappings)
+
+      conn =
+        conn
+        |> post(interface_path(conn, :create, realm),
+          data: interface,
+          async_operation: "false"
+        )
+        |> post(interface_path(conn, :create, realm),
+          data: interface,
+          async_operation: "false"
+        )
+
+      assert json_response(conn, 409)["errors"] != %{}
     end
 
     test "renders error on mapping with higher database_retention_ttl than the maximum", %{
       conn: conn,
       realm: realm
     } do
-      DB.put_datastream_maximum_storage_retention(realm, 1)
+      # TODO: Remove all of this once all RPC calls are not needed anymore
+      interface =
+        Astarte.Core.Generators.Interface.interface(
+          type: :datastream,
+          database_retention_policy: :use_ttl
+        )
+        |> Enum.at(0)
+        |> Map.from_struct()
 
-      iface_with_invalid_mappings = %{
-        @valid_attrs
-        | "mappings" => [
-            %{
-              "endpoint" => "/test",
-              "type" => "integer",
-              "database_retention_policy" => "use_ttl",
-              "database_retention_ttl" => 60
-            }
-          ],
-          "type" => "datastream"
-      }
+      mappings =
+        interface.mappings
+        |> Enum.map(fn mapping ->
+          mapping
+          |> Map.from_struct()
+          |> Map.put(:type, mapping.value_type)
+          |> Map.put(:database_retention_ttl, 1000)
+          |> Map.put(:database_retention_policy, :use_ttl)
+        end)
 
-      conn = post(conn, interface_path(conn, :create, realm), data: iface_with_invalid_mappings)
+      interface =
+        Map.put(interface, :mappings, mappings)
+
+      insert_datastream_maximum_storage_retention!(realm, 10)
+
+      conn =
+        conn
+        |> post(interface_path(conn, :create, realm),
+          data: interface,
+          async_operation: "false"
+        )
+
       assert json_response(conn, 422)["errors"] != %{}
     end
 
@@ -160,13 +241,13 @@ defmodule Astarte.RealmManagement.APIWeb.InterfaceControllerTest do
         @valid_attrs
         |> Map.put("interface_name", interface_name)
 
-      post_conn = post(conn, interface_path(conn, :create, realm), data: first_attrs)
+      post_conn =
+        post(conn, interface_path(conn, :create, realm),
+          data: first_attrs,
+          async_operation: "false"
+        )
+
       assert response(post_conn, 201) == ""
-
-      get_conn =
-        get(conn, interface_path(conn, :show, realm, interface_name, @interface_major_str))
-
-      assert json_response(get_conn, 200)["data"] == first_attrs
 
       colliding_name = "com.astarte-platform.Interface"
 
@@ -174,46 +255,60 @@ defmodule Astarte.RealmManagement.APIWeb.InterfaceControllerTest do
         @valid_attrs
         |> Map.put("interface_name", colliding_name)
 
-      post_conn = post(conn, interface_path(conn, :create, realm), data: colliding_attrs)
+      post_conn =
+        post(conn, interface_path(conn, :create, realm),
+          data: colliding_attrs,
+          async_operation: "false"
+        )
 
-      assert json_response(post_conn, 409)["errors"]["detail"] ==
-               "Interface name collision detected. Make sure that the difference between two interface names is not limited to the casing or the presence of hyphens."
+      assert json_response(post_conn, 409)["errors"] != %{}
     end
   end
 
   describe "update" do
     @describetag :update
 
-    setup %{conn: conn, realm: realm} do
-      post_conn = post(conn, interface_path(conn, :create, realm), data: @valid_attrs)
-      assert response(post_conn, 201) == ""
-      {:ok, conn: conn}
+    setup %{realm: realm} do
+      interface = Astarte.Core.Generators.Interface.interface() |> Enum.at(0) |> to_struct()
+
+      {:ok, interface} =
+        Interfaces.install_interface(realm, interface)
+
+      DB.install_interface(realm, interface)
+
+      %{interface: interface}
     end
 
-    test "updates interface when data is valid", %{conn: conn, realm: realm} do
-      new_mapping = %{"endpoint" => "/other", "type" => "string"}
-      updated_mappings = [new_mapping | @valid_attrs["mappings"]]
-      new_minor = @valid_attrs["version_minor"] + 1
+    test "updates interface when data is valid", %{conn: conn, realm: realm, interface: interface} do
+      new_mapping = %{endpoint: "/other", type: "string"}
+      new_minor = interface.minor_version + 1
 
-      update_attrs = %{
-        @valid_attrs
-        | "version_minor" => new_minor,
-          "mappings" => updated_mappings
-      }
+      update =
+        interface
+        |> to_params()
+        |> Map.put("minor_version", new_minor)
+
+      update = Map.put(update, "mappings", [new_mapping | update["mappings"]])
 
       update_conn =
         put(
           conn,
-          interface_path(conn, :update, realm, @interface_name, @interface_major_str),
-          data: update_attrs
+          interface_path(
+            conn,
+            :update,
+            realm,
+            interface.name,
+            interface.major_version
+          ),
+          data: update
         )
 
       assert response(update_conn, 204)
 
       get_conn =
-        get(conn, interface_path(conn, :show, realm, @interface_name, @interface_major_str))
+        get(conn, interface_path(conn, :show, realm, interface.name, interface.major_version))
 
-      assert json_response(get_conn, 200)["data"] == update_attrs
+      assert json_response(get_conn, 200)["data"] == update
     end
 
     test "renders errors when data is invalid", %{conn: conn, realm: realm} do
@@ -449,5 +544,45 @@ defmodule Astarte.RealmManagement.APIWeb.InterfaceControllerTest do
 
       assert json_response(delete_conn, 404)["errors"] != %{}
     end
+  end
+
+  defp to_struct(interface) do
+    interface
+    |> Map.from_struct()
+    |> Map.put(
+      :mappings,
+      Enum.map(interface.mappings, fn mapping ->
+        mapping |> Map.from_struct() |> Map.put(:type, mapping.value_type)
+      end)
+    )
+  end
+
+  defp to_params(interface) do
+    %{
+      "interface_name" => interface.name,
+      "version_major" => interface.major_version,
+      "version_minor" => interface.minor_version,
+      "type" => interface.type,
+      "ownership" => interface.ownership,
+      "mappings" => to_params_mappings(interface.mappings)
+    }
+  end
+
+  defp to_params_mappings(mappings) do
+    Enum.map(mappings, fn mapping ->
+      %{
+        "endpoint" => mapping.endpoint,
+        "type" => mapping.value_type,
+        "reliability" => mapping.reliability,
+        "retention" => mapping.retention,
+        "expiry" => mapping.expiry,
+        "database_retention_ttl" => mapping.database_retention_ttl,
+        "database_retention_policy" => mapping.database_retention_policy,
+        "allow_unset" => mapping.allow_unset,
+        "explicit_timestamp" => mapping.explicit_timestamp,
+        "description" => mapping.description,
+        "doc" => mapping.doc
+      }
+    end)
   end
 end

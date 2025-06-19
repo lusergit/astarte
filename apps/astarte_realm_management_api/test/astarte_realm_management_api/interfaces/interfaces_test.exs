@@ -58,7 +58,7 @@ defmodule Astarte.RealmManagement.API.InterfacesTest do
     @describetag :creation
 
     test "succeeds with valid attrs", %{realm: realm} do
-      assert {:ok, %Interface{} = interface} = Interfaces.create_interface(realm, @valid_attrs)
+      assert {:ok, %Interface{} = interface} = Interfaces.install_interface(realm, @valid_attrs)
 
       assert %Interface{
                name: @interface_name,
@@ -78,10 +78,10 @@ defmodule Astarte.RealmManagement.API.InterfacesTest do
     end
 
     test "fails with already installed interface", %{realm: realm} do
-      assert {:ok, %Interface{} = _interface} = Interfaces.create_interface(realm, @valid_attrs)
+      assert {:ok, %Interface{} = _interface} = Interfaces.install_interface(realm, @valid_attrs)
 
       assert {:error, :already_installed_interface} =
-               Interfaces.create_interface(realm, @valid_attrs)
+               Interfaces.install_interface(realm, @valid_attrs)
     end
 
     test "fails when interface name collides after normalization", %{realm: realm} do
@@ -89,24 +89,24 @@ defmodule Astarte.RealmManagement.API.InterfacesTest do
         @valid_attrs
         |> Map.put("interface_name", "com.astarteplatform.Interface")
 
-      {:ok, %Interface{}} = Interfaces.create_interface(realm, normalized_attrs)
+      {:ok, %Interface{}} = Interfaces.install_interface(realm, normalized_attrs)
 
       colliding_normalized_attrs =
         @valid_attrs
         |> Map.put("interface_name", "com.astarte-platform.Interface")
 
       assert {:error, :interface_name_collision} =
-               Interfaces.create_interface(realm, colliding_normalized_attrs)
+               Interfaces.install_interface(realm, colliding_normalized_attrs)
     end
 
     test "fails with invalid attrs", %{realm: realm} do
       assert {:error, %Ecto.Changeset{errors: [type: _]}} =
-               Interfaces.create_interface(realm, @invalid_attrs)
+               Interfaces.install_interface(realm, @invalid_attrs)
     end
 
     test "succeeds using a synchronous call", %{realm: realm} do
       assert {:ok, %Interface{} = interface} =
-               Interfaces.create_interface(realm, @valid_attrs, async_operation: false)
+               Interfaces.install_interface(realm, @valid_attrs, async_operation: false)
 
       assert %Interface{
                name: @interface_name,
@@ -143,7 +143,7 @@ defmodule Astarte.RealmManagement.API.InterfacesTest do
       }
 
       assert {:error, :maximum_database_retention_exceeded} =
-               Interfaces.create_interface(realm, iface_with_invalid_mappings)
+               Interfaces.install_interface(realm, iface_with_invalid_mappings)
     end
   end
 
@@ -151,7 +151,7 @@ defmodule Astarte.RealmManagement.API.InterfacesTest do
     @describetag :update
 
     setup %{realm: realm} do
-      {:ok, %Interface{}} = Interfaces.create_interface(realm, @valid_attrs)
+      {:ok, %Interface{}} = Interfaces.install_interface(realm, @valid_attrs)
       :ok
     end
 
@@ -287,7 +287,7 @@ defmodule Astarte.RealmManagement.API.InterfacesTest do
 
     test "fails with invalid attrs", %{realm: realm} do
       assert {:error, %Ecto.Changeset{errors: [type: _]}} =
-               Interfaces.create_interface(realm, @invalid_attrs)
+               Interfaces.install_interface(realm, @invalid_attrs)
     end
 
     test "succeeds with valid attrs using a synchronous call", %{realm: realm} do
@@ -338,7 +338,7 @@ defmodule Astarte.RealmManagement.API.InterfacesTest do
     @describetag :deletion
 
     setup %{realm: realm} do
-      {:ok, %Interface{}} = Interfaces.create_interface(realm, @valid_attrs)
+      {:ok, %Interface{}} = Interfaces.install_interface(realm, @valid_attrs)
       :ok
     end
 
@@ -356,7 +356,7 @@ defmodule Astarte.RealmManagement.API.InterfacesTest do
         @valid_attrs
         |> Map.put("version_major", new_interface_major)
 
-      assert {:ok, %Interface{}} = Interfaces.create_interface(realm, major_attrs)
+      assert {:ok, %Interface{}} = Interfaces.install_interface(realm, major_attrs)
 
       assert {:error, :forbidden} =
                Interfaces.delete_interface(realm, @interface_name, new_interface_major)

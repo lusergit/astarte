@@ -31,17 +31,14 @@ defmodule Astarte.RealmManagement.APIWeb.InterfaceController do
   end
 
   def create(conn, %{"realm_name" => realm_name, "data" => %{} = interface_params} = params) do
-    async_operation =
-      if Map.get(params, "async_operation") == "false" do
-        false
-      else
-        true
+    async =
+      case Map.get(params, "async_operation") do
+        "false" -> false
+        _ -> true
       end
 
     with {:ok, %Interface{} = interface} <-
-           Interfaces.create_interface(realm_name, interface_params,
-             async_operation: async_operation
-           ) do
+           Interfaces.install_interface(realm_name, interface_params, async: async) do
       location =
         interface_path(
           conn,
