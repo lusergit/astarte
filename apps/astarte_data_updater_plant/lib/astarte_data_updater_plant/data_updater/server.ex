@@ -148,11 +148,11 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater.Server do
   end
 
   @impl GenServer
-  def handle_cast({:handle_capabilities, capabilities, message_id, timestamp}, state) do
+  def handle_cast({:handle_capabilities, payload, message_id, timestamp}, state) do
     timeout = Config.data_updater_deactivation_interval_ms!()
 
     if MessageTracker.can_process_message(state.message_tracker, message_id) do
-      new_state = Impl.handle_capabilities(state, capabilities, message_id, timestamp)
+      new_state = Impl.handle_capabilities(state, payload, message_id, timestamp)
       {:no_reply, new_state}
     else
       {:noreply, state, timeout}

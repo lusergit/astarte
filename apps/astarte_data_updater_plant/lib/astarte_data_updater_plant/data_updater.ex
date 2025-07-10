@@ -175,9 +175,9 @@ defmodule Astarte.DataUpdaterPlant.DataUpdater do
 
   @doc delegate_to:
          {Astarte.DataUpdaterPlant.DataUpdater.Core.CapabilitiesHandler, :handle_capabilities, 4}
-  def handle_capabilities(realm, encoded_device_id, capabilities, message_id, timestamp) do
+  def handle_capabilities(realm, encoded_device_id, payload, message_id, timestamp) do
     with_dup_and_message_tracker(realm, encoded_device_id, fn dup, _message_tracker ->
-      GenServer.cast(dup, {:handle_capabilities, capabilities, message_id, timestamp})
+      GenServer.cast(dup, {:handle_capabilities, payload, message_id, timestamp})
     end)
   end
 
