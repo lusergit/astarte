@@ -38,6 +38,8 @@ defmodule Astarte.DataUpdaterPlant.ProducersSupervisor do
   def init(_init_arg) do
     Logger.info("AMQPDataProducer supervisor init.", tag: "data_producer_sup_init")
 
+    create_vhost(Config.amqp_triggers_producer_virtual_host!())
+
     events_pool =
       Supervisor.child_spec(
         {ExRabbitPool.PoolSupervisor,
@@ -57,5 +59,13 @@ defmodule Astarte.DataUpdaterPlant.ProducersSupervisor do
     children = [events_pool, triggers_pool, AMQPEventsProducer, AMQPTriggersProducer]
 
     Supervisor.init(children, strategy: :rest_for_one)
+  end
+
+  defp create_vhost(vhost) do
+    {:ok, _} =
+      ExRabbitMQAdmin.client()
+      |> ExRabbitMQAdmin.add_basic_auth_middleware(username: "guest", password: "guest")
+      |> ExRabbitMQAdmin.Vhost.put_vhost(vhost)
+      |> dbg()
   end
 end
